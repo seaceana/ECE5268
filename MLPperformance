@@ -1,0 +1,85 @@
+# Created By Ceana Palacio
+# MLP Architecture Performance
+
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.model_selection import ParameterGrid
+
+# Define a function to create and train an MLP model
+def create_model(num_layers, num_nodes, input_shape=(28, 28)):
+    model = models.Sequential()
+    model.add(layers.Flatten(input_shape=input_shape))
+    for _ in range(num_layers):
+        model.add(layers.Dense(num_nodes, activation='relu'))
+    model.add(layers.Dense(10, activation='softmax'))
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+# Define hyperparameters grid
+param_grid = {
+    'num_layers': [5, 10, 20],            # Number of layers
+    'num_nodes': [4, 16, 32, 64, 128],          # Number of nodes per layer
+}
+
+# Generate all combinations of hyperparameters
+param_combinations = ParameterGrid(param_grid)
+
+best_loss = float('inf')
+best_model = None
+
+# Load dataset (e.g., MNIST)
+mnist = tf.keras.datasets.mnist
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0 ## pre-processing the pixels
+
+# Iterate over all combinations of hyperparameters
+for params in param_combinations:
+    print("Training model with hyperparameters:", params)
+    model = create_model(params['num_layers'], params['num_nodes'])
+    model.fit(x_train, y_train, epochs=5, validation_data=(x_test, y_test), verbose=0)
+    _, test_loss = model.evaluate(x_test, y_test)
+    print("Test loss:", test_loss)
+    if test_loss < best_loss:
+        best_loss = test_loss
+        best_model = model
+
+print("Best model has a test loss of:", best_loss)
+
+## Code to generate training and test loss curves
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+# Set epoch values to iterate over
+epochs_list = [5, 10, 15, 20, 25, 30]
+
+for params in param_combinations:
+    print("Training model with hyperparameters:", params)
+    
+    # Initialize lists to store losses for each epoch
+    train_losses = []
+    test_losses = []
+    
+    for epochs in epochs_list:
+        print("Training model with {} epochs".format(epochs))
+        
+        model = create_model(params['num_layers'], params['num_nodes'])
+        history = model.fit(x_train, y_train, epochs=epochs, validation_data=(x_test, y_test), verbose=0)
+        
+        # Append training and test losses for the current epoch to the respective lists
+        train_losses.append(history.history['loss'][-1])
+        test_loss, _ = model.evaluate(x_test, y_test, verbose=0)
+        test_losses.append(test_loss)
+    
+    # Plot epoch vs. training and test losses
+    plt.plot(epochs_list, train_losses, label='Training Loss')
+    plt.plot(epochs_list, test_losses, label='Test Loss')
+    plt.title('Loss vs. Epochs for Hyperparameters: {}'.format(params))
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.show()
