@@ -1,0 +1,92 @@
+# Created by Ceana Palacio
+# Last Updated: 04/28/2024
+
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import fetch_openml
+from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import confusion_matrix, accuracy_score
+import pandas as pd
+
+def evaluate_MLP(X_train, X_test, y_train, y_test, hidden_layer_sizes=(100,), activation='relu', solver='adam', alpha=0.0001, learning_rate='constant', max_iter=200):
+    mlp = MLPClassifier(hidden_layer_sizes=hidden_layer_sizes,
+                        activation=activation,
+                        solver=solver,
+                        alpha=alpha,
+                        learning_rate=learning_rate,
+                        max_iter=max_iter)
+    mlp.fit(X_train, y_train)
+    y_pred = mlp.predict(X_test)
+
+    # Generate confusion matrix
+    conf_matrix = confusion_matrix(y_test, y_pred)
+
+    # Calculate accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+
+    return conf_matrix, accuracy
+
+# Load MNIST dataset
+mnist = fetch_openml('mnist_784', version=1)
+X = mnist.data.astype('float32')
+y = mnist.target.astype('int64')
+
+# Normalize the pixel values to the range [0, 1]
+X /= 255.0
+
+# Split data into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Define hyperparameters to iterate over
+hidden_layer_sizes_list = [(2,1), (4,2)]
+activation_list = ['relu']
+solver_list = ['adam', 'sgd']
+alpha_list = [0.0001, 0.01]
+learning_rate_list = ['constant','adaptive']
+max_iter_list = [400, 500]
+
+results = []
+
+# Iterate over different hyperparameters
+for hidden_layer_sizes in hidden_layer_sizes_list:
+    for activation in activation_list:
+        for solver in solver_list:
+            for alpha in alpha_list:
+                for learning_rate in learning_rate_list:
+                    for max_iter in max_iter_list:
+                        # Evaluate MLP classifier
+                        conf_matrix, accuracy = evaluate_MLP(X_train, X_test, y_train, y_test,
+                                                             hidden_layer_sizes=hidden_layer_sizes,
+                                                             activation=activation,
+                                                             solver=solver,
+                                                             alpha=alpha,
+                                                             learning_rate=learning_rate,
+                                                             max_iter=max_iter)
+                        # Store results
+                        results.append({
+                            'hidden_layer_sizes': hidden_layer_sizes,
+                            'activation': activation,
+                            'solver': solver,
+                            'alpha': alpha,
+                            'learning_rate': learning_rate,
+                            'max_iter': max_iter,
+                            'accuracy': accuracy
+                        })
+
+# Create a DataFrame from the results
+results_df = pd.DataFrame(results)
+
+# Plot confusion matrix for the best performing model
+best_model_index = results_df['accuracy'].idxmax()
+best_model_conf_matrix = confusion_matrix(y_test, MLPClassifier(**results_df.loc[best_model_index, ['hidden_layer_sizes', 'activation', 'solver', 'alpha', 'learning_rate', 'max_iter']]).fit(X_train, y_train).predict(X_test))
+plt.figure(figsize=(8, 6))
+sns.heatmap(best_model_conf_matrix, annot=True, cmap='Blues', fmt='g', cbar=False)
+plt.title('Confusion Matrix for Best Performing Model')
+plt.xlabel('Predicted labels')
+plt.ylabel('True labels')
+plt.show()
+
+# Display table of accuracy values
+print(results_df[['hidden_layer_sizes', 'activation', 'solver', 'alpha', 'learning_rate', 'max_iter', 'accuracy']])
